@@ -28,6 +28,7 @@ class decisionNode:
 		# Decision-making model parameters
 		self.sigma	= 4. 				# Stop signal parameter
 		self.v 	= 0.1*np.ones(self.N)	# Values for the two options
+		self.gain 	= 1. 				# Value gain (default = 1)
 
 		# Set up pointers for the node's children
 		self.child0 = None				# By default, no children
@@ -67,3 +68,22 @@ class decisionNode:
 
 			# Concatenate your state plus the states of the children
 			self.z0 = np.r_[self.z0, self.child1.z0]
+
+	def nodeFlow(self, m, v):
+		'''Implements the Seeley et al. model embedding an unfolded pitchfork.
+		This drives decision-making at a given node on the basis of the option
+		values v.'''
+		# Initialize output
+		mDot = np.zeros(self.N + 1)
+
+		# Scale the values by the gain factor (default = 1)
+		h = self.gain * v
+
+		# Compute dynamics for each option
+		mDot[:-1] += -m[:-1]/h + h*m[-1]*(1+m[:-1]) - self.sigma*m[:-1].cumprod()[-1]
+
+		# Adjust for the "unmotivated" motivation (so sum = 0)
+		mDot[-1] = -np.sum(mDot[:-1])
+
+		return mDot
+
