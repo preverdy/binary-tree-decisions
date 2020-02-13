@@ -16,9 +16,9 @@ class decisionNode:
 		self.N 	= 2 	# number of options at this node
 
 		# Initial conditions for the state variables and parameters
-		self.v0	= 0.1*np.ones(self.N)	# Initial values > 0
-		self.m0 = np.zeros(self.N + 1)	# Initial motivation state
-		self.m0[-1]	= 1.				# Initially, 100% uncommitted
+		#self.v0	= 0.1*np.ones(self.N)	# Initial values > 0
+		self.m0 = np.zeros(self.N)		# Initial motivation state
+										# Initially, 100% uncommitted
 
 		# Simulation parameters
 		self.t0		= 0. 				# Initial time
@@ -33,6 +33,10 @@ class decisionNode:
 		# Set up pointers for the node's children
 		self.child0 = None				# By default, no children
 		self.child1 = None
+
+		# Set up locations for option names
+		self.option0 = ''				# Option 0
+		self.option1 = ''				# Option 1
 
 	def setup(self):
 		'''Method to traverse the decision tree in depth-first order using
@@ -58,6 +62,9 @@ class decisionNode:
 			# Concatenate your state plus the states of the children
 			self.z0 = np.r_[self.z0, self.child0.z0]
 
+			# Update the associated value to be the mean of the children's
+			self.v[0] = self.child0.v.mean()
+
 		if self.child1 is not None:	# If there is a right child, set it up
 			self.child1.setup()
 
@@ -69,21 +76,102 @@ class decisionNode:
 			# Concatenate your state plus the states of the children
 			self.z0 = np.r_[self.z0, self.child1.z0]
 
+			# Update the associated value to be the mean of the children's
+			self.v[1] = self.child1.v.mean()
+
 	def nodeFlow(self, m, v):
 		'''Implements the Seeley et al. model embedding an unfolded pitchfork.
 		This drives decision-making at a given node on the basis of the option
 		values v.'''
+
+		# Uses coordinates m = (m1, m2). Then mU = 1-m1-m2
 		# Initialize output
-		mDot = np.zeros(self.N + 1)
+		mDot = np.zeros(self.N)
 
 		# Scale the values by the gain factor (default = 1)
 		h = self.gain * v
 
 		# Compute dynamics for each option
-		mDot[:-1] += -m[:-1]/h + h*m[-1]*(1+m[:-1]) - self.sigma*m[:-1].cumprod()[-1]
+		mU = 1-np.sum(m)
+		mDot += -m/h + h*mU*(1+m) - self.sigma*m.cumprod()[-1]
 
 		# Adjust for the "unmotivated" motivation (so sum = 0)
-		mDot[-1] = -np.sum(mDot[:-1])
+		#mDot[-1] = -np.sum(mDot[:-1])
 
 		return mDot
 
+	def flow(self, m, t):
+		'''Flow function for the dynamics associated to the node and its 
+		descendants, if they exist.'''
+
+		# Extract the node's own state
+		mSelf = m[ : self.N]
+
+		mDot = self.nodeFlow(mSelf, self.v)
+
+		# Now, parse the four cases: no children, child0, child1, and both
+		if self.child0 is None:
+			if self.child1 is None:
+				# No children: no recursion needed (base case)
+
+				# Concatenate the vector fields
+				zDot = np.r_[mDot]
+
+			else:
+				# Only child1
+				# Parse the state variable: m = r_[mSelf, m1]
+				# Own state
+				mSelf = m[ : self.N] # r_[mSelf, m1]
+
+				# Child1 state variables
+				m1 = m[self.N : ]
+
+				# Compute the child flow
+				m1Dot = self.child1.flow(m1, t)
+
+				# Concatenate the flow vector fields
+				mDot = np.r_[mDot, m1Dot]
+		else:	# child0 exists
+			if self.child1 is None:
+				# Only child0
+				# Parse the state variable: m = r_[mSelf, m0]
+				# Own state
+				mSelf = m[ : self.N]
+
+				# Child0 state variables
+				m0 = m[self.N : ]
+
+				# Compute the child flow
+				m0Dot = self.child0.flow(m0, t)
+
+				# Concatenate the flow vector fields
+				mDot = np.r_[mDot, m0Dot]
+			else:
+				# Both children exist; need to be careful about parsing states
+				# Parse the state variables: m = r_[mSelf, m0, m1]
+				# Own state
+				mSelf = m[ : self.N ]
+
+				# Child0 state variables (1 + nDescendants copies of m)
+				m0 = m[self.N : (2+self.child0.nDescendants)*self.N]
+
+				# Child1 state variables (1 + nDescendants copies of m)
+				m1 = m[(2+self.child0.nDescendants)*self.N : ]
+
+				# Compute the child flows
+				m0Dot = self.child0.flow(m0, t)
+				m1Dot = self.child1.flow(m1, t)
+
+				mDot = np.r_[mDot, m0Dot, m1Dot]
+
+		return mDot
+
+	def simulate(self):
+		'''Method to integrate the vector field flow and parse the resulting
+		state traces.'''
+
+		self.tt = np.linspace(self.t0, self.tf, self.tpts)
+
+		z = odeint(self.flow, self.z0, self.tt)
+
+		self.zOut = z
