@@ -92,11 +92,8 @@ class decisionNode:
 		h = self.gain * v
 
 		# Compute dynamics for each option
-		mU = 1-np.sum(m)
+		mU = 1-np.sum(m)	# Unmotivated component
 		mDot += -m/h + h*mU*(1+m) - self.sigma*m.cumprod()[-1]
-
-		# Adjust for the "unmotivated" motivation (so sum = 0)
-		#mDot[-1] = -np.sum(mDot[:-1])
 
 		return mDot
 
