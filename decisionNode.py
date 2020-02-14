@@ -219,31 +219,31 @@ class decisionNode:
 				# No children: just output zSelfOut
 				zOut = zSelfOut
 			else:	# Only child1
-				mOut1 = [:, self.N :]
-				zOut1 = zSelfOut[:, 1]*mOut1
+				mOut1 = mOut[:, self.N :]
+				zOut1 = np.atleast_2d(zSelfOut[:, 1]).transpose()*mOut1
 
-				zOut = c_[zSelfOut, zOut1]
+				zOut = np.c_[zSelfOut, zOut1]
 		else:	# child0 exists
 			if self.child1 is None:
 				# Only child0
-				mOut0 = [:, self.N :]
-				zOut0 = zSelfOut[:, 0]*mOut0
+				mOut0 = mOut[:, self.N :]
+				zOut0 = np.atleast_2d(zSelfOut[:, 0]).transpose()*mOut0
 
-				zOut = c_[zSelfOut, zOut1]
+				zOut = np.c_[zSelfOut, zOut1]
 			else:
 				# Both children exist; need to be careful about parsing states
 				# Parse the state variables: zOut = c_[zSelf, z0, z1]
 
 				# Child0 state variables (nChildren copies of z)
-				mOut0 = [:, self.N : (2+self.child0.nDescendants)*self.N]
+				mOut0 = mOut[:, self.N : (2+self.child0.nDescendants)*self.N]
 
 				# Child1 state variables (nChildren copies of z)
-				mOut1 = [:, (2+self.child0.nDescendants)*self.N :]
+				mOut1 = mOut[:, (2+self.child0.nDescendants)*self.N :]
 
-				zOut0 = zSelfOut[:, 0]*mOut0
-				zOut1 = zSelfOut[:, 1]*mOut1
+				zOut0 = np.atleast_2d(zSelfOut[:, 0]).transpose()*mOut0
+				zOut1 = np.atleast_2d(zSelfOut[:, 1]).transpose()*mOut1
 
-				zOut = c_[zSelfOut, zOut0, zOut1]
+				zOut = np.c_[zSelfOut, zOut0, zOut1]
 
 		return zOut
 
