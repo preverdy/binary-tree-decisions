@@ -97,6 +97,21 @@ class decisionNode:
 
 		return mDot
 
+	def nodeFlowz(self, zi, ziParent, ziParentDot, vi):
+		'''Implements the flow for the z variables associated with the children
+		of a node i. zi = ziParent*mi.'''
+
+		# Extract mi
+		mi = zi/ziParent
+
+		# Compute miDot
+		miDot = self.nodeFlow(mi, vi)
+
+		# Compute ziDot
+		ziDot = ziParentDot*mi + ziParent*miDot
+
+		return ziDot
+
 	def flow(self, m, t):
 		'''Flow function for the dynamics associated to the node and its 
 		descendants, if they exist.'''
@@ -162,6 +177,31 @@ class decisionNode:
 				mDot = np.r_[mDot, m0Dot, m1Dot]
 
 		return mDot
+
+	def flowz(self, z, t):
+		'''Flow function for the node states and their dynamics using the 
+		recursive z coordinates.'''
+
+		# Extract the node's own state
+		zSelf = z[ : self.N]
+
+		# Start at the root node (special case)
+		if self.isRoot:
+			ziParent 	= 1
+			ziParentDot = 0
+			zSelfDot = self.nodeFlowz(zSelf, ziParent, ziParentDot, self.v)
+		else: # Not at the root; must have a parent
+			# Parse the four cases: no children, child0, child1, and both
+			if self.child0 is None:
+				if self.child1 is None:
+					# No children: just output zSelfDot
+					zDot = zSelfDot
+				else: # Only child1
+				# Parse the state variable: z = r_[zSelf, z1]
+				z1 = z[self.N : ]
+				z1Dot = self.child1.flow()
+
+		return zDot
 
 	def simulate(self):
 		'''Method to integrate the vector field flow and parse the resulting
