@@ -206,6 +206,48 @@ class decisionNode:
 
 		return zDot
 
+
+	def parseMStates(self, mOut):
+		'''Assumes that mOut is the output of the simulation. mOut is an array
+		of shape (self.tpts, 2*total states).'''
+
+		# Extract nodes's own state
+		zSelfOut = mOut[:, :self.N]
+
+		if self.child0 is None:
+			if self.child1 is None:
+				# No children: just output zSelfOut
+				zOut = zSelfOut
+			else:	# Only child1
+				mOut1 = [:, self.N :]
+				zOut1 = zSelfOut[:, 1]*mOut1
+
+				zOut = c_[zSelfOut, zOut1]
+		else:	# child0 exists
+			if self.child1 is None:
+				# Only child0
+				mOut0 = [:, self.N :]
+				zOut0 = zSelfOut[:, 0]*mOut0
+
+				zOut = c_[zSelfOut, zOut1]
+			else:
+				# Both children exist; need to be careful about parsing states
+				# Parse the state variables: zOut = c_[zSelf, z0, z1]
+
+				# Child0 state variables (nChildren copies of z)
+				mOut0 = [:, self.N : (2+self.child0.nDescendants)*self.N]
+
+				# Child1 state variables (nChildren copies of z)
+				mOut1 = [:, (2+self.child0.nDescendants)*self.N :]
+
+				zOut0 = zSelfOut[:, 0]*mOut0
+				zOut1 = zSelfOut[:, 1]*mOut1
+
+				zOut = c_[zSelfOut, zOut0, zOut1]
+
+		return zOut
+
+
 	def simulate(self):
 		'''Method to integrate the vector field flow and parse the resulting
 		state traces.'''
