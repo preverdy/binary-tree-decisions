@@ -200,9 +200,9 @@ class decisionNode:
 					# No children: just output zSelfDot
 					zDot = zSelfDot
 				else: # Only child1
-				# Parse the state variable: z = r_[zSelf, z1]
-				z1 = z[self.N : ]
-				z1Dot = self.child1.flow()
+					# Parse the state variable: z = r_[zSelf, z1]
+					z1 = z[self.N : ]
+					z1Dot = self.child1.flow()
 
 		return zDot
 
