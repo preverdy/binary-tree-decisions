@@ -209,7 +209,8 @@ class decisionNode:
 
 	def parseMStates(self, mOut):
 		'''Assumes that mOut is the output of the simulation. mOut is an array
-		of shape (self.tpts, 2*total states).'''
+		of shape (self.tpts, 2*total states). Returns zOut, an array of the 
+		same shape in terms of the z coordinates'''
 
 		# Extract nodes's own state
 		zSelfOut = mOut[:, :self.N]
@@ -219,31 +220,92 @@ class decisionNode:
 				# No children: just output zSelfOut
 				zOut = zSelfOut
 			else:	# Only child1
-				mOut1 = mOut[:, self.N :]
-				zOut1 = np.atleast_2d(zSelfOut[:, 1]).transpose()*mOut1
+				mChild1 	  = mOut[:, self.N : 2*self.N]
+				mDescendants1 = mOut[:, 2*self.N :]
 
-				zOut = np.c_[zSelfOut, zOut1]
+				zChild1  = np.atleast_2d(zSelfOut[:, 1]).transpose()*mChild1
+
+				# Recurse down the tree (only multiply the immediate child m)
+				z1Out = self.child1.parseMStates(np.c_[zChild1, mDescendants1])
+
+				zOut = np.c_[zSelfOut, z1Out]
 		else:	# child0 exists
 			if self.child1 is None:
 				# Only child0
-				mOut0 = mOut[:, self.N :]
-				zOut0 = np.atleast_2d(zSelfOut[:, 0]).transpose()*mOut0
+				mChild0 	  = mOut[:, self.N : 2*self.N]
+				mDescendants0 = mOut[:, 2*self.N :]
 
-				zOut = np.c_[zSelfOut, zOut1]
+				zChild0 = np.atleast_2d(zSelfOut[:, 0]).transpose()*mChild0
+
+				# Recurse down the tree (only multiply the immediate child m)
+				z0Out = self.child0.parseMStates(np.c_[zChild0, mDescendants0])
+
+				zOut = np.c_[zSelfOut, z0Out]
 			else:
 				# Both children exist; need to be careful about parsing states
 				# Parse the state variables: zOut = c_[zSelf, z0, z1]
 
 				# Child0 state variables (nChildren copies of z)
-				mOut0 = mOut[:, self.N : (2+self.child0.nDescendants)*self.N]
+				mChild0 	  = mOut[:, self.N : 2*self.N]
+				mDescendants0 = mOut[:, 2*self.N : (2+self.child0.nDescendants)*self.N]
+				zChild0 	  = np.atleast_2d(zSelfOut[:, 0]).transpose()*mChild0
 
 				# Child1 state variables (nChildren copies of z)
-				mOut1 = mOut[:, (2+self.child0.nDescendants)*self.N :]
+				mChild1 	  = mOut[:, (2+self.child0.nDescendants)*self.N : (3+self.child0.nDescendants)*self.N]
+				mDescendants1 = mOut[:, (3+self.child0.nDescendants)*self.N :]
+				zChild1 	  = np.atleast_2d(zSelfOut[:, 1]).transpose()*mChild1
 
-				zOut0 = np.atleast_2d(zSelfOut[:, 0]).transpose()*mOut0
-				zOut1 = np.atleast_2d(zSelfOut[:, 1]).transpose()*mOut1
+				# Recurse down the tree
+				z0Out = self.child0.parseMStates(np.c_[zChild0, mDescendants0])
+				z1Out = self.child1.parseMStates(np.c_[zChild1, mDescendants1])
 
-				zOut = np.c_[zSelfOut, zOut0, zOut1]
+				zOut = np.c_[zSelfOut, z0Out, z1Out]
+
+		return zOut
+
+	def parseLeafStates(self, zOut):
+		'''Method to extract the states associated with the leaf nodes, i.e.,
+		the options. Assumes that the input is zOut, an array of the processed
+		outputs of shape (self.tpts, 2*total internal nodes)'''
+
+		# Extract node's own state
+		zSelfOut = zOut[:, :self.N]
+
+		if self.child0 is None:
+			if self.child1 is None:
+				# No children: just output zSelfOut
+				zOut = zSelfOut
+			else:	# Only child1
+				zDescendants1 = zOut[:, self.N :]
+
+				# Recurse down the tree (only multiply the immediate child m)
+				z1Out = self.child1.parseMStates(zDescendants1)
+
+				zOut = np.c_[zSelfOut[:, 1], z1Out]
+		else:	# child0 exists
+			if self.child1 is None:
+				# Only child0
+				zDescendants0 = zOut[:, self.N :]
+
+				# Recurse down the tree (only multiply the immediate child m)
+				z0Out = self.child0.parseMStates(zDescendants0)
+
+				zOut = np.c_[z0Out, zSelfOut[:, 0]]
+			else:
+				# Both children exist; need to be careful about parsing states
+				# Parse the state variables: zOut = c_[zSelf, z0, z1]
+
+				# Child0 state variables (nChildren copies of z)
+				zDescendants0 = zOut[:, self.N : (2+self.child0.nDescendants)*self.N]
+				
+				# Child1 state variables (nChildren copies of z)
+				zDescendants1 = zOut[:, (2+self.child0.nDescendants)*self.N :]
+				
+				# Recurse down the tree
+				z0Out = self.child0.parseLeafStates(zDescendants0)
+				z1Out = self.child1.parseLeafStates(zDescendants1)
+
+				zOut = np.c_[z0Out, z1Out]
 
 		return zOut
 
