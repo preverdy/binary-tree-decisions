@@ -285,11 +285,16 @@ class decisionNode:
 
 
 	def simulate(self):
-		'''Method to integrate the vector field flow and parse the resulting
+		'''Method to integrate the mDot vector field flow and parse the resulting
 		state traces.'''
+
+		self.setup()
 
 		self.tt = np.linspace(self.t0, self.tf, self.tpts)
 
-		z = odeint(self.flow, self.z0, self.tt)
+		m = odeint(self.flow, self.z0, self.tt)
 
-		self.zOut = z
+		self.mOut = m
+
+		self.zOut = self.parseMStates(self.mOut)
+		self.mOptions = n.parseLeafStates(self.zOut)
